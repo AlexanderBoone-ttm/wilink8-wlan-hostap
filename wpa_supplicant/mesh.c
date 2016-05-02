@@ -313,9 +313,15 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 		wpa_s->global->mesh_on_demand.signal_threshold 	= wpa_s->conf->signal_threshold;
 		wpa_s->global->mesh_on_demand.meshBlocked	 	= TRUE;
 		wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ============= MESH IS BLOCKED");
-		sprintf(wpa_s->global->mesh_on_demand.signal_threshold_name,"learn:30:%d:30\n",wpa_s->global->mesh_on_demand.signal_threshold);
+                if (ssid->bgscan)
+			sprintf(wpa_s->global->mesh_on_demand.signal_threshold_name,"%s", ssid->bgscan);
+		else
+			sprintf(wpa_s->global->mesh_on_demand.signal_threshold_name,"learn:%d:%d:%d\n",
+				0xFFFF,
+				wpa_s->global->mesh_on_demand.signal_threshold,
+				0xFFFF);
 
-		/*
+                /*
 		* Check if we already have a connected station
 		* if that's the case write over the bgscan parameters the new threshold value we would like to use
 		*/

@@ -1644,7 +1644,7 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 
 					if (wpa_s->global->mesh_on_demand.anyMeshConnected)
 					{
-						wpa_supplicant_req_scan(wpa_s,10,0);
+						wpa_supplicant_req_scan(wpa_s,60,0);
 						wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - Mesh connected and bad RSSI - Don't connect");
 						return -1;
 					}
