@@ -409,10 +409,7 @@ static void mesh_mpm_fsm_restart(struct wpa_supplicant *wpa_s,
 {
 	struct hostapd_data *hapd = wpa_s->ifmsh->bss[0];
 
-	hapd->num_plinks--;
-
 	eloop_cancel_timeout(plink_timer, wpa_s, sta);
-
 	ap_free_sta(hapd, sta);
 }
 
@@ -542,7 +539,12 @@ static void plink_timer(void *eloop_ctx, void *user_data)
 			wpa_auth_pmksa_remove(hapd->wpa_auth, sta->addr);
 		}
 		mesh_mpm_fsm_restart(wpa_s, sta);
-		break;
+
+		if (wpa_s->global->mesh_on_demand.enabled &&
+		    hapd && (hapd->num_plinks == 0)) {
+			wpa_s->global->mesh_on_demand.anyMeshConnected = FALSE;
+		}
+                break;
 	default:
 		break;
 	}
@@ -573,6 +575,10 @@ int mesh_mpm_plink_close(struct hostapd_data *hapd, struct sta_info *sta,
 	int reason = WLAN_REASON_MESH_PEERING_CANCELLED;
 
 	if (sta) {
+		/* Switching from established to holding - decrease plinks count*/
+		if (sta->plink_state == PLINK_ESTAB)
+			hapd->num_plinks--;
+
 		wpa_mesh_set_plink_state(wpa_s, sta, PLINK_HOLDING);
 
 		mesh_mpm_send_plink_action(wpa_s, sta, PLINK_CLOSE, reason);
@@ -831,8 +837,7 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 	if (wpa_s->ifmsh->mesh_deinit_process)
                 return;
 
-	if ( (wpa_s->global->mesh_on_demand.enabled) && (wpa_s->global->mesh_on_demand.meshBlocked) )
-	{
+	if ((wpa_s->global->mesh_on_demand.enabled) && (wpa_s->global->mesh_on_demand.meshBlocked)) {
 		if (!data->mesh_pending_auth)
 			return;
 
@@ -844,11 +849,9 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
 		*/
 		mgmt = wpabuf_head(data->mesh_pending_auth);
 		os_reltime_age(&data->mesh_pending_auth_time, &age);
-		if (age.sec < 2 && os_memcmp(mgmt->sa, addr, ETH_ALEN) == 0)
-		{
+		if (age.sec < 2 && os_memcmp(mgmt->sa, addr, ETH_ALEN) == 0) {
 			data->mesh_pending_auth = FALSE;
-		}
-		else
+		} else
 			return;
 	}
 
@@ -860,8 +863,7 @@ void wpa_mesh_new_mesh_peer(struct wpa_supplicant *wpa_s, const u8 *addr,
                wpa_msg(wpa_s, MSG_ERROR, "will not initiate new peer link with "
                        MACSTR " either no_auto_peer or peer does not allow new links", MAC2STR(addr));
 
-		if (data->mesh_pending_auth)
-		{
+		if (data->mesh_pending_auth) {
 			mgmt = wpabuf_head(data->mesh_pending_auth);
 			os_reltime_age(&data->mesh_pending_auth_time, &age);
 			if (age.sec < 2 && os_memcmp(mgmt->sa, addr, ETH_ALEN) == 0) {
@@ -965,7 +967,7 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 {
 	struct hostapd_data *hapd = wpa_s->ifmsh->bss[0];
 	struct mesh_conf *conf = wpa_s->ifmsh->mconf;
-	struct wpa_supplicant *keep_wpa_s;
+	struct wpa_supplicant *keep_wpa_s = NULL;
 	int found = FALSE;
 	u16 reason = 0;
 
@@ -1050,54 +1052,34 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 			mesh_mpm_plink_estab(wpa_s, sta);
 
 			// we've just got mesh link connected
-			if (wpa_s->global->mesh_on_demand.enabled)
-			{
-				struct i802_bss *bss;
-				struct wpa_driver_nl80211_data *drv;
-
+			if (wpa_s->global->mesh_on_demand.enabled) {
 				wpa_s->global->mesh_on_demand.anyMeshConnected = TRUE;
 
-				keep_wpa_s = wpa_s->global->ifaces;
+				keep_wpa_s = wpa_s->global->mesh_on_demand.sta_wpa_s;
+				if (keep_wpa_s && (keep_wpa_s->wpa_state == WPA_COMPLETED) &&
+				    (wpa_s->global->mesh_on_demand.meshBlocked == FALSE)) {
+					struct wpa_ssid *keep_current_ssid;
 
-				while (keep_wpa_s && !found)
-				{
-					bss = keep_wpa_s->drv_priv;
-					drv = bss->drv;
+					keep_current_ssid = keep_wpa_s->current_ssid;
+					wpa_msg(wpa_s, MSG_DEBUG, "mesh on demand: disconnect station current SSID is: %s!!!",wpa_ssid_txt(keep_current_ssid->ssid,keep_current_ssid->ssid_len));
 
-					if (drv->nlmode == NL80211_IFTYPE_STATION)
-						found = TRUE;
-					else
-						keep_wpa_s = keep_wpa_s->next;
+					/*
+					 * disconnect station from AP
+					 */
+					keep_wpa_s->reassociate = 0;
+					keep_wpa_s->disconnected = 1;
+					wpa_supplicant_cancel_sched_scan(keep_wpa_s);
+					wpa_supplicant_cancel_scan(keep_wpa_s);
+					wpa_supplicant_deauthenticate(keep_wpa_s,
+								      WLAN_REASON_DEAUTH_LEAVING);
+					eloop_cancel_timeout(wpas_network_reenabled, keep_wpa_s, NULL);
+
+					/*
+					 * reselect the network we've just disconnected from and try to reconnect
+					 */
+					wpa_supplicant_select_network(keep_wpa_s, keep_current_ssid);
 				}
 			}
-
-			if ( (found) && (keep_wpa_s->wpa_state == WPA_COMPLETED) &&
-						 (wpa_s->global->mesh_on_demand.meshBlocked == FALSE) )
-			{
-				struct wpa_ssid *keep_current_ssid;
-
-				keep_current_ssid = keep_wpa_s->current_ssid;
-
-				wpa_msg(wpa_s, MSG_DEBUG, "mesh on demand: disconnect station current SSID is: %s!!!",wpa_ssid_txt(keep_current_ssid->ssid,keep_current_ssid->ssid_len));
-
-				/*
-				* disconnect station from AP
-				*/
-				keep_wpa_s->reassociate = 0;
-				keep_wpa_s->disconnected = 1;
-				wpa_supplicant_cancel_sched_scan(keep_wpa_s);
-				wpa_supplicant_cancel_scan(keep_wpa_s);
-				wpa_supplicant_deauthenticate(keep_wpa_s,
-							      WLAN_REASON_DEAUTH_LEAVING);
-				eloop_cancel_timeout(wpas_network_reenabled, keep_wpa_s, NULL);
-
-				/*
-				* reselect the network we've just disconnected from and try to reconnect
-				*/
-				wpa_supplicant_select_network(keep_wpa_s,keep_current_ssid);
-
-			}
-
 			break;
 		default:
 			break;
@@ -1135,6 +1117,7 @@ static void mesh_mpm_fsm(struct wpa_supplicant *wpa_s, struct sta_info *sta,
 		switch (event) {
 		case CLS_ACPT:
 			wpa_mesh_set_plink_state(wpa_s, sta, PLINK_HOLDING);
+			hapd->num_plinks--;
 			reason = WLAN_REASON_MESH_CLOSE_RCVD;
 
 			eloop_register_timeout(
@@ -1395,6 +1378,12 @@ void mesh_mpm_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 {
 	if (sta->plink_state == PLINK_ESTAB)
 		hapd->num_plinks--;
+
 	eloop_cancel_timeout(plink_timer, ELOOP_ALL_CTX, sta);
 	eloop_cancel_timeout(mesh_auth_timer, ELOOP_ALL_CTX, sta);
+
+	if (hapd->num_plinks == 0) {
+		struct wpa_supplicant *wpa_s = hapd->iface->owner;
+                wpa_s->global->mesh_on_demand.anyMeshConnected = FALSE;
+	}
 }

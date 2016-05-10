@@ -1628,29 +1628,25 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		int skip;
 
 		// in case we are running mesh on demand we need to see if we would like to connect at all
-		if (wpa_s->global->mesh_on_demand.enabled)
-		{
+		if (wpa_s->global->mesh_on_demand.enabled) {
 			// we should only check this for the station and not the mesh interface
-			if (wpa_s != wpa_s->global->mesh_on_demand.mesh_wpa_s)
-			{
+			if (wpa_s != wpa_s->global->mesh_on_demand.mesh_wpa_s) {
 				wpa_s->global->mesh_on_demand.meshBlocked = TRUE;
-				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ============= MESH IS BLOCKED");
+				wpa_msg(wpa_s, MSG_DEBUG, "Mesh on demand - ============= MESH IS BLOCKED");
 
 				// if we are below the connection threshold
-				if (selected->level < wpa_s->global->mesh_on_demand.signal_threshold)
-				{
+				if (selected->level < wpa_s->global->mesh_on_demand.signal_threshold) {
 					wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
-					wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");
+					wpa_msg(wpa_s, MSG_DEBUG, "Mesh on demand - ********************* MESH IS UNBLOCKED");
 
-					if (wpa_s->global->mesh_on_demand.anyMeshConnected)
-					{
-						wpa_supplicant_req_scan(wpa_s,60,0);
-						wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - Mesh connected and bad RSSI - Don't connect");
+					if (wpa_s->global->mesh_on_demand.anyMeshConnected) {
+						if (wpa_supplicant_req_sched_scan(wpa_s))
+							wpa_supplicant_req_new_scan(wpa_s, wpa_s->scan_interval, 0);
+						wpa_msg(wpa_s, MSG_DEBUG, "Mesh on demand - Mesh connected and bad RSSI - Don't connect");
 						return -1;
 					}
 				}
 			}
-
 		}
 
 		skip = !wpa_supplicant_need_to_roam(wpa_s, selected, ssid);
@@ -4007,22 +4003,16 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		* If Mesh on Demand is configured try to connect to Mesh network
 		* and disconnect from AP
 		*/
-		if (wpa_s->global->mesh_on_demand.enabled)
-		{
-			if (data->signal_change.above_threshold == FALSE)
-			{
+		if (wpa_s->global->mesh_on_demand.enabled) {
+			if (data->signal_change.above_threshold == FALSE) {
 				wpa_printf(MSG_INFO, "Threshold was crossed downwards - RSSI is lower");
 				wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
 				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");
-
-			}
-			else
-			{
+			} else {
 				wpa_printf(MSG_INFO, "Threshold was crossed upwards - RSSI is higher");
 				wpa_s->global->mesh_on_demand.meshBlocked = TRUE;
 				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ============= MESH IS BLOCKED");
 			}
-
 		}
 
 		break;

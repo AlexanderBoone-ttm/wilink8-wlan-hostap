@@ -301,8 +301,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
        /*
        * Initialize mesh on demand parameters
        */
-	if (wpa_s->conf->mesh_on_demand)
-	{
+	if (wpa_s->conf->mesh_on_demand) {
 		struct i802_bss *bss;
 		struct wpa_driver_nl80211_data *drv;
 		struct wpa_supplicant *keep_wpa_s;
@@ -328,8 +327,7 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 
 		keep_wpa_s = wpa_s->global->ifaces;
 
-		while (keep_wpa_s && !found)
-		{
+		while (keep_wpa_s && !found) {
 			bss = keep_wpa_s->drv_priv;
 			drv = bss->drv;
 
@@ -339,21 +337,19 @@ static int wpa_supplicant_mesh_init(struct wpa_supplicant *wpa_s,
 				keep_wpa_s = keep_wpa_s->next;
 		}
 
-		if (found)
-		{
+		if (found) {
+			wpa_s->global->mesh_on_demand.sta_wpa_s = keep_wpa_s;
+
 			/*
 			* we have found the station connection and it's already connected
 			* stop the bgscan and send a new bgscan with the mesh on demand RSSI
 			* threshold parameters
 			*/
-
-			if (keep_wpa_s->wpa_state == WPA_COMPLETED)
-			{
+			if (keep_wpa_s->wpa_state == WPA_COMPLETED) {
 				wpa_supplicant_stop_bgscan(keep_wpa_s);
 				wpa_supplicant_start_bgscan(keep_wpa_s);
 			}
 		}
-
 	}
 
 	return 0;

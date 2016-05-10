@@ -255,11 +255,12 @@ struct p2p_srv_upnp {
 };
 
 struct mesh_on_demand {
-	Boolean  				meshBlocked;
+	Boolean  			meshBlocked;
 	Boolean				anyMeshConnected;
-	struct wpa_supplicant *mesh_wpa_s;
+        struct wpa_supplicant 		*sta_wpa_s;
+	struct wpa_supplicant 		*mesh_wpa_s;
 	Boolean				enabled;
-	int					signal_threshold;
+	int				signal_threshold;
 	char 				signal_threshold_name[30];
 };
 
