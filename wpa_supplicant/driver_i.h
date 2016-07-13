@@ -87,6 +87,13 @@ static inline int wpa_drv_leave_mesh(struct wpa_supplicant *wpa_s)
 	return -1;
 }
 
+static inline int wpa_drv_get_worst_mesh_point(struct wpa_supplicant *wpa_s, u8 *macaddr)
+{
+	if (wpa_s->driver->get_worst_mesh)
+		return wpa_s->driver->get_worst_mesh(wpa_s->drv_priv, macaddr);
+	return -1;
+}
+
 static inline int wpa_drv_scan(struct wpa_supplicant *wpa_s,
 			       struct wpa_driver_scan_params *params)
 {

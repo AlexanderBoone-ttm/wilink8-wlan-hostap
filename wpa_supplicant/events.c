@@ -1007,7 +1007,8 @@ struct wpa_ssid * wpa_scan_res_match(struct wpa_supplicant *wpa_s,
 			continue;
 		}
 
-		if (!bss_is_ess(bss) && !bss_is_pbss(bss)) {
+		if (ssid->mode != IEEE80211_MODE_MESH && !bss_is_ess(bss) &&
+		    !bss_is_pbss(bss)) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "   skip - neither ESS nor PBSS network");
 			continue;
 		}
@@ -1116,6 +1117,8 @@ wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s,
 			  int only_first_ssid)
 {
 	unsigned int i;
+	struct wpa_ssid *temp_selected_ssid = NULL;
+	struct wpa_bss *temp_bss = NULL;
 
 	if (only_first_ssid)
 		wpa_dbg(wpa_s, MSG_DEBUG, "Try to find BSS matching pre-selected network id=%d",
@@ -1130,11 +1133,42 @@ wpa_supplicant_select_bss(struct wpa_supplicant *wpa_s,
 						    only_first_ssid);
 		if (!*selected_ssid)
 			continue;
+#ifdef CONFIG_MESH
+                /*if this is mesh - need to make sure selected is accapting new connections*/
+		if (wpa_s->ifmsh) {
+			const u8 *mesh_ie = wpa_bss_get_ie(bss, WLAN_EID_MESH_CONFIG);
+			if (!mesh_ie) {
+                                *selected_ssid = NULL;
+				continue;
+			}
+			if (!(mesh_ie[8] & 0x1)) {
+				/* Mesh not accapting new connections - save it for later*/
+				wpa_dbg(wpa_s, MSG_DEBUG, "Skip selected for now - MP not accapting new links");
+				if (!temp_selected_ssid) {
+					temp_selected_ssid = *selected_ssid;
+					temp_bss = bss;
+				}
+				*selected_ssid = NULL;
+                                continue;
+			}
+		}
+#endif /*CONFIG_MESH*/
+
 		wpa_dbg(wpa_s, MSG_DEBUG, "   selected BSS " MACSTR
 			" ssid='%s'",
 			MAC2STR(bss->bssid),
 			wpa_ssid_txt(bss->ssid, bss->ssid_len));
 		return bss;
+	}
+
+	if (temp_selected_ssid) {
+		/* No "accapting" mesh peers - select best "not-accapting"*/
+		*selected_ssid = temp_selected_ssid;
+		wpa_dbg(wpa_s, MSG_DEBUG, "   selected BSS " MACSTR
+			" ssid='%s'",
+			MAC2STR(temp_bss->bssid),
+			wpa_ssid_txt(temp_bss->ssid, temp_bss->ssid_len));
+		return temp_bss;
 	}
 
 	return NULL;
@@ -1676,11 +1710,11 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		return 1;
 	} else {
 #ifdef CONFIG_MESH
-		// in case we are running mesh on demand and didn't find our AP we should unblock mesh connections now
-		if (wpa_s->global->mesh_on_demand.enabled)
-		{
-			if (wpa_s != wpa_s->global->mesh_on_demand.mesh_wpa_s)
-			{
+		/* in case we are running mesh on demand and didn't find our AP
+		 * we should unblock mesh connections now
+		 */
+		if (wpa_s->global->mesh_on_demand.enabled) {
+			if (wpa_s != wpa_s->global->mesh_on_demand.mesh_wpa_s) {
 				wpa_s->global->mesh_on_demand.meshBlocked = FALSE;
 				wpa_msg(wpa_s, MSG_DEBUG,"Mesh on demand - ********************* MESH IS UNBLOCKED");
 			}
@@ -1689,6 +1723,10 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 		if (wpa_s->ifmsh) {
 			wpa_msg(wpa_s, MSG_DEBUG,
 				"Avoiding join because we already joined a mesh group");
+
+			/* Schedule delayed scan for the mesh interface*/
+			wpa_supplicant_mesh_delayed_scan(wpa_s,
+							 MESH_CONNECT_SCAN_PERIOD, 0);
 			return 0;
 		}
 #endif /* CONFIG_MESH */

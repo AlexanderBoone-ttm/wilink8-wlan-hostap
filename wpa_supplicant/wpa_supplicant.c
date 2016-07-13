@@ -1740,19 +1740,25 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 				return;
 			}
 		}
-
-		if (wpa_supplicant_join_mesh(wpa_s, ssid) < 0) {
-			wpa_msg(wpa_s, MSG_ERROR, "Could not join mesh");
-			return;
+		if (wpa_s->ifmsh) {
+			wpa_mesh_connect(wpa_s, bss->bssid,
+					 (u8*) (bss + 1),
+					 bss->ie_len);
+		} else {
+			if (wpa_supplicant_join_mesh(wpa_s, ssid) < 0) {
+				wpa_msg(wpa_s, MSG_ERROR, "Could not join mesh");
+				return;
+			}
+			wpa_s->current_bss = bss;
+			wpa_msg(wpa_s, MSG_INFO, MESH_GROUP_STARTED "ssid=\"%s\" id=%d",
+				wpa_ssid_txt(ssid->ssid, ssid->ssid_len),
+				ssid->id);
 		}
-		wpa_s->current_bss = bss;
-		wpa_msg(wpa_s, MSG_INFO, MESH_GROUP_STARTED "ssid=\"%s\" id=%d",
-			wpa_ssid_txt(ssid->ssid, ssid->ssid_len),
-			ssid->id);
 #else /* CONFIG_MESH */
 		wpa_msg(wpa_s, MSG_ERROR,
 			"mesh mode support not included in the build");
 #endif /* CONFIG_MESH */
+
 		return;
 	}
 

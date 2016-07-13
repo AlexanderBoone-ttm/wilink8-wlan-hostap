@@ -260,7 +260,10 @@ struct hostapd_data {
 	int max_plinks;
 	void (*mesh_sta_free_cb)(struct hostapd_data *hapd,
 				 struct sta_info *sta);
+	Boolean mesh_switch_connection;
 	struct wpabuf *mesh_pending_auth;
+	struct wpabuf *mesh_pending_action;
+	u8 mesh_beacon_pending_peer[ETH_ALEN];
 	struct os_reltime mesh_pending_auth_time;
 	u8 mesh_required_peer[ETH_ALEN];
 #endif /* CONFIG_MESH */

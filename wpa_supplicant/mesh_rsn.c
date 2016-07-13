@@ -298,6 +298,12 @@ int mesh_rsn_auth_sae_sta(struct wpa_supplicant *wpa_s,
 		return -1;
 	}
 
+        if (sta->sae && sta->sae->state > SAE_NOTHING) {
+		wpa_msg(wpa_s, MSG_DEBUG,
+			"AUTH: No nested connections!!");
+		return -1;
+	}
+
 	if (!sta->sae) {
 		sta->sae = os_zalloc(sizeof(*sta->sae));
 		if (sta->sae == NULL)
