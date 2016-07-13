@@ -9390,6 +9390,20 @@ static int nl80211_configure_data_frame_filters(void *priv, u32 filter_flags)
 	return 0;
 }
 
+static int nl80211_get_low_signal_mesh(void *priv, u8 *macaddr)
+{
+	struct i802_bss *bss = priv;
+	struct wpa_driver_nl80211_data *drv = bss->drv;
+	struct nl_msg *msg;
+	struct wiphy_idx_data info = {
+		.macaddr = macaddr,
+	};
+
+        msg = nl80211_drv_msg(drv, 0, NL80211_CMD_GET_LOW_SIGNAL_MESH);
+	os_memset(macaddr, 0, ETH_ALEN);
+
+	return send_and_recv_msgs(drv, msg, netdev_info_handler, &info);
+}
 
 const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.name = "nl80211",
@@ -9490,6 +9504,7 @@ const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.init_mesh = wpa_driver_nl80211_init_mesh,
 	.join_mesh = wpa_driver_nl80211_join_mesh,
 	.leave_mesh = wpa_driver_nl80211_leave_mesh,
+	.get_worst_mesh = nl80211_get_low_signal_mesh,
 #endif /* CONFIG_MESH */
 	.br_add_ip_neigh = wpa_driver_br_add_ip_neigh,
 	.br_delete_ip_neigh = wpa_driver_br_delete_ip_neigh,

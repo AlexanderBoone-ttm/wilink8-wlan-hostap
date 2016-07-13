@@ -3515,6 +3515,14 @@ struct wpa_driver_ops {
 	 */
 	int (*leave_mesh)(void *priv);
 
+        /**
+         *  get_worst_mesh - get lowest signal mesh peer link
+         *  : Private driver interface data
+         *  : mac of the lowest mesh peer link
+         *  Returns 0 on success, -1 on failure
+         */
+	int (*get_worst_mesh)(void *priv, u8 *macaddr);
+
 	/**
 	 * do_acs - Automatically select channel
 	 * @priv: Private driver interface data

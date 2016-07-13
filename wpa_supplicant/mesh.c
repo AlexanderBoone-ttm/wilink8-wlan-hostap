@@ -28,6 +28,9 @@
 #include "../src/drivers/driver_nl80211.h"
 
 
+/* Time for initial mesh connection after join*/
+#define INIT_MESH_CONNECTION_TIME 3
+
 static void wpa_supplicant_mesh_deinit(struct wpa_supplicant *wpa_s)
 {
 	wpa_supplicant_mesh_iface_deinit(wpa_s, wpa_s->ifmsh);
@@ -39,6 +42,24 @@ static void wpa_supplicant_mesh_deinit(struct wpa_supplicant *wpa_s)
 	 * anyway, so it's not urgent */
 }
 
+static void mesh_delayed_scan_timeout(void *eloop_ctx, void *timeout_ctx)
+{
+	struct wpa_supplicant *wpa_s = eloop_ctx;
+	struct hostapd_data *hapd = wpa_s->ifmsh->bss[0];
+
+        /* Mesh will only scan if it currently has no links*/
+	if (hapd->num_plinks == 0) {
+                wpa_supplicant_req_scan(wpa_s, 0, 0);
+	}
+}
+
+void wpa_supplicant_mesh_delayed_scan(struct wpa_supplicant *wpa_s,
+				     int sec, int usec)
+{
+	eloop_register_timeout(sec, usec,
+			       mesh_delayed_scan_timeout,
+			       wpa_s, NULL);
+}
 
 void wpa_supplicant_mesh_iface_deinit(struct wpa_supplicant *wpa_s,
 				      struct hostapd_iface *ifmsh)
@@ -492,6 +513,9 @@ int wpa_supplicant_join_mesh(struct wpa_supplicant *wpa_s,
 	wpa_drv_set_operstate(wpa_s, 1);
 
 	wpa_supplicant_set_state(wpa_s, WPA_COMPLETED);
+
+        /* Schedule delayed scan for the mesh interface */
+        wpa_supplicant_mesh_delayed_scan(wpa_s, INIT_MESH_CONNECTION_TIME, 0);
 
 out:
 	return ret;
