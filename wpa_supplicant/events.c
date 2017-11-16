@@ -4160,6 +4160,7 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		if (wpa_s->ap_iface && data)
 			hostapd_event_sta_low_ack(wpa_s->ap_iface->bss[0],
 						  data->low_ack.addr);
+#ifdef CONFIG_MESH
 		if (wpa_s->ifmsh && data)
 		{
 			struct hostapd_data *hapd;
@@ -4169,8 +4170,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			sta = ap_get_sta(hapd,data->low_ack.addr);
 
 			if (sta->plink_state == PLINK_ESTAB)
-				mesh_mpm_plink_close(hapd,sta,wpa_s);		
+				mesh_mpm_plink_close(hapd,sta,wpa_s);
 		}
+#endif /* CONFIG_MESH */
 #endif /* CONFIG_AP */
 #ifdef CONFIG_TDLS
 		if (data)
