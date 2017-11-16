@@ -9390,6 +9390,7 @@ static int nl80211_configure_data_frame_filters(void *priv, u32 filter_flags)
 	return 0;
 }
 
+#ifdef CONFIG_MESH
 static int nl80211_get_low_signal_mesh(void *priv, u8 *macaddr)
 {
 	struct i802_bss *bss = priv;
@@ -9404,6 +9405,7 @@ static int nl80211_get_low_signal_mesh(void *priv, u8 *macaddr)
 
 	return send_and_recv_msgs(drv, msg, netdev_info_handler, &info);
 }
+#endif /* CONFIG_MESH */
 
 const struct wpa_driver_ops wpa_driver_nl80211_ops = {
 	.name = "nl80211",
