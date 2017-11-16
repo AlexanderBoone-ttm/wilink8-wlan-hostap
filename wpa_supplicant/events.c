@@ -2500,6 +2500,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 	/*
 	* after we finished handling the STA connection we can now remove the Mesh link
 	*/
+#ifdef CONFIG_MESH
 	if ( (wpa_s->global->mesh_on_demand.enabled)
 		&& (wpa_s->wpa_state == WPA_COMPLETED)
 		&&  (wpa_s->global->mesh_on_demand.anyMeshConnected)) {
@@ -2507,6 +2508,7 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 			mesh_mpm_close_links(wpa_s->global->mesh_on_demand.mesh_wpa_s,
 								     wpa_s->global->mesh_on_demand.mesh_wpa_s->ifmsh);
 	}
+#endif /* CONFIG_MESH */
 }
 
 
